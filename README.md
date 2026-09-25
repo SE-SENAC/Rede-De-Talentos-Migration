@@ -2,6 +2,12 @@
 
 Módulo em Python desenvolvido para migrar dados do banco de dados legado (`[RedeDeTalentos].[dbo]`) para o novo esquema relacional (`RedeDeTalentos_DEV` / Microsoft SQL Server 2022), construído com rigor arquitetural seguindo **Clean Architecture**, **Arquitetura Hexagonal (Ports & Adapters)**, **SOLID** e **Clean Code**.
 
+> [!IMPORTANT]
+> **Documentação Centralizada:**  
+> Toda a documentação técnica oficial, manuais em Word (`.docx`), dicionário de dados em 3FN e arquitetura de migração estão centralizados no diretório [**`Documentação/`**](file:///c:/Users/leon.trindade/Documents/Rede%20de%20Talentos/Documentação) na raiz do projeto. Consulte:
+> - [**`NOVAS_FUNCIONALIDADES.md`**](file:///c:/Users/leon.trindade/Documents/Rede%20de%20Talentos/Documentação/NOVAS_FUNCIONALIDADES.md) para detalhes do serviço de migração.
+> - [**`Documentacao_Banco_De_Dados_e_Migracao.md`**](file:///c:/Users/leon.trindade/Documents/Rede%20de%20Talentos/Documentação/Documentacao_Banco_De_Dados_e_Migracao.md) para o manual integral de banco de dados e migração.
+
 ---
 
 ## 🧱 Arquitetura do Sistema
