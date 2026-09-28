@@ -133,13 +133,13 @@ class TargetSqlServerRepository(TargetDatabasePort):
             return 0
         sql = """
         INSERT INTO [dbo].[address] (
-            id, street, number, neighborhood, city, state, complement, zipcode, latitude, longitude
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            id, street, number, neighborhood, city, state, complement, zipcode
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """
         params = [
             (
                 str(a.id), a.street, a.number, a.neighborhood, a.city, a.state,
-                a.complement, a.zipcode, a.latitude, a.longitude
+                a.complement, a.zipcode
             )
             for a in addresses
         ]

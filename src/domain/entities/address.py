@@ -12,6 +12,3 @@ class AddressEntity:
     state: str
     zipcode: str
     complement: str | None = None
-    latitude: float | None = None
-    longitude: float | None = None
-

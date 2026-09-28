@@ -137,8 +137,6 @@ class SeedCredentialsUseCase(StepMigrationPort):
             city="Aracaju",
             state="SE",
             zipcode="49025000",
-            latitude=-10.9856,
-            longitude=-37.0544,
         )
 
         comp_cont_id = UUIDFactory.create_deterministic("seed_cont", company_email)
