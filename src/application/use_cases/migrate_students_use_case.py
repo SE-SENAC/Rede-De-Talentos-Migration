@@ -44,11 +44,23 @@ class MigrateStudentsUseCase(StepMigrationPort):
         seen_cpfs = set()
 
         def flush_students_batch():
+            nonlocal migrated_count, errors_count
             if not dry_run and students:
                 try:
-                    self.target_db.save_students(students)
+                    saved = self.target_db.save_students(students)
+                    migrated_count += saved
+                    if saved < len(students):
+                        diff = len(students) - saved
+                        errors_count += diff
+                        self.reporter.log_error(f"{diff} estudantes não puderam ser persistidos no banco de destino.")
+                except Exception as e:
+                    errors_count += len(students)
+                    self.reporter.log_error(f"Erro ao salvar lote de estudantes: {e}", e)
                 finally:
                     students.clear()
+            elif dry_run and students:
+                migrated_count += len(students)
+                students.clear()
 
         for row in self.source_db.get_students():
             extracted_count += 1
@@ -84,7 +96,6 @@ class MigrateStudentsUseCase(StepMigrationPort):
 
                 seen_cpfs.add(cpf_str)
                 students.append(student_entity)
-                migrated_count += 1
 
                 if len(students) >= self.batch_size:
                     flush_students_batch()

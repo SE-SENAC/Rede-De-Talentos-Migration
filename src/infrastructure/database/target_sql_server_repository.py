@@ -101,13 +101,23 @@ class TargetSqlServerRepository(TargetDatabasePort):
 
             # Fallback seguro linha por linha
             saved = 0
+            last_error = None
             for row in params:
                 try:
                     cursor.execute(sql, row)
                     conn.commit()
                     saved += 1
-                except Exception:
+                except Exception as row_e:
                     conn.rollback()
+                    last_error = row_e
+
+            if saved < len(params) and last_error:
+                import sys
+                print(
+                    f"[AVISO-BD] Tabela [{table_name}]: {saved}/{len(params)} registros salvos. Último erro detectado: {last_error}",
+                    file=sys.stderr,
+                )
+
             return saved
 
     def save_users(self, users: List[UserEntity]) -> int:

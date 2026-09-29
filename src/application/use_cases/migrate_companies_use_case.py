@@ -51,17 +51,32 @@ class MigrateCompaniesUseCase(StepMigrationPort):
         seen_cnpjs = set()
 
         def flush_companies_batch():
+            nonlocal migrated_count, errors_count
             if not dry_run and companies:
                 try:
                     self.target_db.save_addresses(addresses)
                     self.target_db.save_contacts(contacts)
                     self.target_db.save_phones(phones)
-                    self.target_db.save_companies(companies)
+                    saved = self.target_db.save_companies(companies)
+                    migrated_count += saved
+                    if saved < len(companies):
+                        diff = len(companies) - saved
+                        errors_count += diff
+                        self.reporter.log_error(f"{diff} empresas não puderam ser persistidas no banco de destino.")
+                except Exception as e:
+                    errors_count += len(companies)
+                    self.reporter.log_error(f"Erro ao salvar lote de empresas: {e}", e)
                 finally:
                     addresses.clear()
                     contacts.clear()
                     phones.clear()
                     companies.clear()
+            elif dry_run and companies:
+                migrated_count += len(companies)
+                addresses.clear()
+                contacts.clear()
+                phones.clear()
+                companies.clear()
 
         for row in self.source_db.get_empresas():
             extracted_count += 1
@@ -106,7 +121,6 @@ class MigrateCompaniesUseCase(StepMigrationPort):
                 contacts.append(cont)
                 phones.append(phone)
                 companies.append(comp)
-                migrated_count += 1
 
                 if len(companies) >= self.batch_size:
                     flush_companies_batch()

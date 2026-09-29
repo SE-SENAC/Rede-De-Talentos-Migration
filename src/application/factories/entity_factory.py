@@ -51,6 +51,15 @@ class EntityFactory:
     """
 
     @staticmethod
+    def _truncate_to_bytes(text: str | None, max_bytes: int) -> str | None:
+        if not text:
+            return text
+        encoded = text.encode("utf-8")
+        if len(encoded) <= max_bytes:
+            return text
+        return encoded[:max_bytes].decode("utf-8", errors="ignore")
+
+    @staticmethod
     def _parse_int_safe(val: Any, default: int = 0) -> int:
         if val is None:
             return default
@@ -132,15 +141,20 @@ class EntityFactory:
 
         # 1. Address
         address_id = UUIDFactory.create_deterministic("address", dto.id)
+        raw_street = dto.logradouro.strip() if dto.logradouro else "Não informado"
+        raw_bairro = dto.bairro.strip() if dto.bairro else "Centro"
+        raw_cidade = dto.cidade.strip() if dto.cidade else "Aracaju"
+        raw_comp = dto.complemento.strip() if dto.complemento else None
+
         address = AddressEntity(
             id=address_id,
-            street=dto.logradouro.strip() if dto.logradouro else "Não informado",
+            street=cls._truncate_to_bytes(raw_street, 50) or "Não informado",
             number=cls._parse_int_safe(dto.numero, default=0),
-            neighborhood=dto.bairro.strip() if dto.bairro else "Centro",
-            city=dto.cidade.strip() if dto.cidade else "Aracaju",
+            neighborhood=cls._truncate_to_bytes(raw_bairro, 50) or "Centro",
+            city=cls._truncate_to_bytes(raw_cidade, 50) or "Aracaju",
             state=(dto.estado.strip()[:2].upper() if dto.estado else "SE"),
             zipcode=re.sub(r"\D", "", str(dto.cep or "49000000"))[:10],
-            complement=dto.complemento.strip() if dto.complemento else None,
+            complement=cls._truncate_to_bytes(raw_comp, 50) if raw_comp else None,
         )
 
         # 2. Contact
@@ -282,12 +296,29 @@ class EntityFactory:
             except Exception:
                 pass
 
+        # Title normalization: >= 4 chars, <= 255 bytes
+        raw_title = (dto.titulo or "").strip()
+        if len(raw_title) < 4:
+            raw_title = f"Vaga {raw_title}".strip() if raw_title else "Oportunidade de Trabalho"
+            if len(raw_title) < 4:
+                raw_title = raw_title.ljust(4, ".")
+        title = cls._truncate_to_bytes(raw_title, 255)
+
+        # Description normalization: >= 10 chars, <= 500 bytes
+        raw_desc = (dto.descricao or "").strip()
+        if len(raw_desc) < 10:
+            if raw_desc:
+                raw_desc = f"Nesta vaga vai ser realizado atividades de: {raw_desc}".strip()
+            else:
+                raw_desc = f"Nesta vaga vai ser realizado atividades de: {raw_title}".strip()
+        description = cls._truncate_to_bytes(raw_desc, 500)
+
         return JobEntity(
             id=job_id,
             company_id=company_id,
-            title=dto.titulo[:255] if dto.titulo else "Oportunidade de Trabalho",
-            description=dto.descricao[:500] if dto.descricao else None,
-            segment=dto.segmento[:255] if dto.segmento else None,
+            title=title,
+            description=description,
+            segment=cls._truncate_to_bytes(dto.segmento, 255) if dto.segmento else None,
             work_mode=JobWorkMode.from_legacy(dto.modalidade),
             type=JobType.from_legacy(dto.tipo),
             pcd=bool(dto.pcd or False),
@@ -300,7 +331,7 @@ class EntityFactory:
             show_contact_email=bool(dto.mostrar_email_contato if dto.mostrar_email_contato is not None else True),
             show_contact_phone=bool(dto.mostrar_telefone_contato if dto.mostrar_telefone_contato is not None else True),
             show_salary=bool(dto.mostrar_salario if dto.mostrar_salario is not None else True),
-            benefits=dto.beneficios[:1000] if dto.beneficios else None,
+            benefits=cls._truncate_to_bytes(dto.beneficios, 1000) if dto.beneficios else None,
             closing_date=dto.data_encerramento,
             published_at=published_at,
             updated_at=updated_at,

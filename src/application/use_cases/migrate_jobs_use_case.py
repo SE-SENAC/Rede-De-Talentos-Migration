@@ -53,11 +53,23 @@ class MigrateJobsUseCase(StepMigrationPort):
         jobs: List[JobEntity] = []
 
         def flush_jobs_batch():
+            nonlocal migrated_count, errors_count
             if not dry_run and jobs:
                 try:
-                    self.target_db.save_jobs(jobs)
+                    saved = self.target_db.save_jobs(jobs)
+                    migrated_count += saved
+                    if saved < len(jobs):
+                        diff = len(jobs) - saved
+                        errors_count += diff
+                        self.reporter.log_error(f"{diff} vagas não puderam ser persistidas no banco de destino.")
+                except Exception as e:
+                    errors_count += len(jobs)
+                    self.reporter.log_error(f"Erro ao salvar lote de vagas: {e}", e)
                 finally:
                     jobs.clear()
+            elif dry_run and jobs:
+                migrated_count += len(jobs)
+                jobs.clear()
 
         for row in self.source_db.get_vagas():
             extracted_count += 1
@@ -100,7 +112,6 @@ class MigrateJobsUseCase(StepMigrationPort):
                     continue
 
                 jobs.append(job_entity)
-                migrated_count += 1
 
                 if len(jobs) >= self.batch_size:
                     flush_jobs_batch()

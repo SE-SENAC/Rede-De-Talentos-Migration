@@ -242,3 +242,74 @@ def test_company_and_student_bundle_creation():
     assert cont.show_email is True
     assert phone.phone.ddd == "79"
     assert comp.is_senac_partner is True
+
+
+def test_education_enums_match_database_constraints():
+    from src.domain.enums.student_enums import StudentEducation
+    from src.domain.enums.job_enums import JobEducation
+
+    valid_db_values = {
+        "FUNDAMENTAL_INCOMPLETO",
+        "FUNDAMENTAL_COMPLETO",
+        "MEDIO_INCOMPLETO",
+        "MEDIO_COMPLETO",
+        "TECNICO_INCOMPLETO",
+        "TECNICO_COMPLETO",
+        "SUPERIOR_INCOMPLETO",
+        "SUPERIOR_COMPLETO",
+        "POS_GRADUACAO",
+        "MESTRADO",
+        "DOUTORADO",
+        "NAO_INFORMADO",
+    }
+
+    for item in StudentEducation:
+        assert item.value in valid_db_values
+
+    for item in JobEducation:
+        assert item.value in valid_db_values
+
+    assert StudentEducation.from_legacy("MÉDIO_COMPLETO").value == "MEDIO_COMPLETO"
+    assert StudentEducation.from_legacy("ENSINO_SUPERIOR_COMPLETO").value == "SUPERIOR_COMPLETO"
+    assert StudentEducation.COMPLETE_HIGH_SCHOOL.value == "MEDIO_COMPLETO"
+    assert JobEducation.from_legacy("POS_GRADUACAO").value == "POS_GRADUACAO"
+    assert JobEducation.POSTGRADUATE_DEGREE.value == "POS_GRADUACAO"
+
+
+def test_job_short_title_and_description_normalization():
+    id_mapper = InMemoryIdMapper()
+    company_uuid = UUIDFactory.create_deterministic("company", 99)
+    id_mapper.set_mapping("company", 99, company_uuid)
+
+    # Vaga com título curto (< 4) e descrição curta (< 10)
+    dto = LegacyVagaDTO(
+        id=184,
+        empresa_id=99,
+        titulo="TI",
+        descricao="atendente",
+        data_publicacao=None,
+        data_atualizacao=None,
+        data_encerramento=None,
+        segmento="Comércio",
+        modalidade="PRESENCIAL",
+        tipo="CLT",
+        pcd=False,
+        escolaridade_minima=None,
+        idade_minima=None,
+        status="ABERTO",
+        salario=1500.0,
+        salario_maximo=None,
+        beneficios=None,
+        recrutador_id=None,
+        mostrar_email_contato=True,
+        mostrar_salario=True,
+        mostrar_telefone_contato=True,
+        quantidade_vagas=1,
+    )
+
+    job = EntityFactory.create_job_from_legacy(dto, id_mapper)
+    assert job is not None
+    assert len(job.title) >= 4
+    assert len(job.description) >= 10
+    assert job.description == "Nesta vaga vai ser realizado atividades de: atendente"
+

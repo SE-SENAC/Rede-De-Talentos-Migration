@@ -50,11 +50,23 @@ class MigrateUsersUseCase(StepMigrationPort):
         seen_emails = set()
 
         def flush_users_batch():
+            nonlocal migrated_count, errors_count
             if not dry_run and users_batch:
                 try:
-                    self.target_db.save_users(users_batch)
+                    saved = self.target_db.save_users(users_batch)
+                    migrated_count += saved
+                    if saved < len(users_batch):
+                        diff = len(users_batch) - saved
+                        errors_count += diff
+                        self.reporter.log_error(f"{diff} usuários não puderam ser persistidos no banco de destino.")
+                except Exception as e:
+                    errors_count += len(users_batch)
+                    self.reporter.log_error(f"Erro ao salvar lote de usuários: {e}", e)
                 finally:
                     users_batch.clear()
+            elif dry_run and users_batch:
+                migrated_count += len(users_batch)
+                users_batch.clear()
 
         # 1. Processar Usuários Legados
         for row in self.source_db.get_usuarios():
@@ -94,7 +106,6 @@ class MigrateUsersUseCase(StepMigrationPort):
 
                 seen_emails.add(email_str)
                 users_batch.append(entity)
-                migrated_count += 1
 
                 if len(users_batch) >= self.batch_size:
                     flush_users_batch()
@@ -131,7 +142,6 @@ class MigrateUsersUseCase(StepMigrationPort):
 
                 seen_emails.add(email_str)
                 users_batch.append(entity)
-                migrated_count += 1
 
                 if len(users_batch) >= self.batch_size:
                     flush_users_batch()

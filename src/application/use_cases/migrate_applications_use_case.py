@@ -44,11 +44,23 @@ class MigrateApplicationsUseCase(StepMigrationPort):
         seen_pairs = set()
 
         def flush_applications_batch():
+            nonlocal migrated_count, errors_count
             if not dry_run and applications:
                 try:
-                    self.target_db.save_applications(applications)
+                    saved = self.target_db.save_applications(applications)
+                    migrated_count += saved
+                    if saved < len(applications):
+                        diff = len(applications) - saved
+                        errors_count += diff
+                        self.reporter.log_error(f"{diff} inscrições não puderam ser persistidas no banco de destino.")
+                except Exception as e:
+                    errors_count += len(applications)
+                    self.reporter.log_error(f"Erro ao salvar lote de inscrições: {e}", e)
                 finally:
                     applications.clear()
+            elif dry_run and applications:
+                migrated_count += len(applications)
+                applications.clear()
 
         for row in self.source_db.get_inscricoes():
             extracted_count += 1
@@ -80,7 +92,6 @@ class MigrateApplicationsUseCase(StepMigrationPort):
 
                 seen_pairs.add(pair)
                 applications.append(app_entity)
-                migrated_count += 1
 
                 if len(applications) >= self.batch_size:
                     flush_applications_batch()

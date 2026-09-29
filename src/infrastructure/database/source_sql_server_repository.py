@@ -66,7 +66,6 @@ class SourceSqlServerRepository(SourceDatabasePort):
 
             columns = [column[0] for column in cursor.description]
             for row in cursor.fetchall():
-                yield dict(zip(columns, row))
                 row_dict = dict(zip(columns, row))
                 if columns:
                     pk_val = row[0]
@@ -76,7 +75,16 @@ class SourceSqlServerRepository(SourceDatabasePort):
                 # Cria aliases normalizados para evitar problemas de case e acentuação/encoding
                 for col_name, val in list(row_dict.items()):
                     if isinstance(col_name, str):
-                        clean_name = col_name.lower().replace("", "ca").replace("ç", "c").replace("ã", "a")
+                        clean_name = (
+                            col_name.lower()
+                            .replace("ç", "c")
+                            .replace("ã", "a")
+                            .replace("á", "a")
+                            .replace("é", "e")
+                            .replace("í", "i")
+                            .replace("ó", "o")
+                            .replace("ú", "u")
+                        )
                         if clean_name not in row_dict:
                             row_dict[clean_name] = val
                 yield row_dict
