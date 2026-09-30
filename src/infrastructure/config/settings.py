@@ -55,7 +55,11 @@ class MigrationSettings:
     target_db: DatabaseSettings
 
     @classmethod
-    def load_from_env(cls) -> "MigrationSettings":
+    def load_from_env(cls, environment: str = "dev") -> "MigrationSettings":
+        environment = environment.lower()
+        if environment not in {"dev", "prod"}:
+            raise ValueError("Migration environment must be 'dev' or 'prod'.")
+
         source_db = DatabaseSettings(
             driver=os.getenv("SOURCE_DB_DRIVER", "ODBC Driver 18 for SQL Server"),
             server=os.getenv("SOURCE_DB_SERVER", "127.0.0.1"),
@@ -68,17 +72,42 @@ class MigrationSettings:
             read_only=True,  # Banco de Origem SEMPRE estritamente somente leitura
         )
 
-        target_db = DatabaseSettings(
-            driver=os.getenv("TARGET_DB_DRIVER", "ODBC Driver 18 for SQL Server"),
-            server=os.getenv("TARGET_DB_SERVER", "127.0.0.1"),
-            port=int(os.getenv("TARGET_DB_PORT", "1440")),
-            name=os.getenv("TARGET_DB_NAME", "RedeDeTalentos_DEV"),
-            user=os.getenv("TARGET_DB_USER", "sa"),
-            password=os.getenv("TARGET_DB_PASSWORD", "SenacDRSE@2026"),
-            trust_server_certificate=os.getenv("TARGET_DB_TRUST_SERVER_CERTIFICATE", "yes"),
-            timeout=int(os.getenv("TARGET_DB_TIMEOUT", "15")),
-            read_only=False,
-        )
+        if environment == "prod":
+            required_prod_values = {
+                "TARGET_PROD_DB_SERVER": os.getenv("TARGET_PROD_DB_SERVER", "").strip(),
+                "TARGET_PROD_DB_NAME": os.getenv("TARGET_PROD_DB_NAME", "").strip(),
+                "TARGET_PROD_DB_USER": os.getenv("TARGET_PROD_DB_USER", "").strip(),
+                "TARGET_PROD_DB_PASSWORD": os.getenv("TARGET_PROD_DB_PASSWORD", "").strip(),
+            }
+            missing_prod_values = [key for key, value in required_prod_values.items() if not value]
+            if missing_prod_values:
+                raise ValueError(
+                    "--prod requires configuration for: " + ", ".join(missing_prod_values)
+                )
+
+            target_db = DatabaseSettings(
+                driver=os.getenv("TARGET_PROD_DB_DRIVER", "ODBC Driver 18 for SQL Server"),
+                server=required_prod_values["TARGET_PROD_DB_SERVER"],
+                port=int(os.getenv("TARGET_PROD_DB_PORT", "1433")),
+                name=required_prod_values["TARGET_PROD_DB_NAME"],
+                user=required_prod_values["TARGET_PROD_DB_USER"],
+                password=required_prod_values["TARGET_PROD_DB_PASSWORD"],
+                trust_server_certificate=os.getenv("TARGET_PROD_DB_TRUST_SERVER_CERTIFICATE", "yes"),
+                timeout=int(os.getenv("TARGET_PROD_DB_TIMEOUT", "15")),
+                read_only=False,
+            )
+        else:
+            target_db = DatabaseSettings(
+                driver=os.getenv("TARGET_DB_DRIVER", "ODBC Driver 18 for SQL Server"),
+                server=os.getenv("TARGET_DB_SERVER", "127.0.0.1"),
+                port=int(os.getenv("TARGET_DB_PORT", "1440")),
+                name=os.getenv("TARGET_DB_NAME", "RedeDeTalentos_DEV"),
+                user=os.getenv("TARGET_DB_USER", "sa"),
+                password=os.getenv("TARGET_DB_PASSWORD", "SenacDRSE@2026"),
+                trust_server_certificate=os.getenv("TARGET_DB_TRUST_SERVER_CERTIFICATE", "yes"),
+                timeout=int(os.getenv("TARGET_DB_TIMEOUT", "15")),
+                read_only=False,
+            )
 
         return cls(
             batch_size=int(os.getenv("MIGRATION_BATCH_SIZE", "250")),

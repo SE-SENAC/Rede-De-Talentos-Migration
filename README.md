@@ -67,17 +67,22 @@ Ou diretamente via Python:
 .venv\Scripts\activate
 
 # Validar conexões com os bancos
-python main.py --verify
+python main.py --dev --verify
 
 # Simular migração (Dry-Run: sem gravar no banco de destino)
-python main.py --dry-run
+python main.py --dev --dry-run
 
 # Executar migração completa
-python main.py
+python main.py --dev
 
 # Executar etapa específica (ex: apenas usuários, apenas vagas)
-python main.py --step users
-python main.py --step jobs
+python main.py --dev --step users
+python main.py --dev --step jobs
+
+# Producao: configure TARGET_PROD_DB_* no .env antes de executar
+python main.py --prod --dry-run
+python main.py --prod --verify
+python main.py --prod
 ```
 
 ---

@@ -27,6 +27,11 @@ class TargetDatabasePort(ABC):
         pass
 
     @abstractmethod
+    def get_target_schema_status(self) -> tuple[str, List[str]]:
+        """Retorna o banco conectado e as tabelas necessárias que ainda não existem."""
+        pass
+
+    @abstractmethod
     def save_users(self, users: List[UserEntity]) -> int:
         pass
 
@@ -81,5 +86,4 @@ class TargetDatabasePort(ABC):
     @abstractmethod
     def clean_target_tables(self) -> None:
         pass
-
 

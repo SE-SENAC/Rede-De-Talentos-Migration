@@ -103,6 +103,9 @@ class MockTargetDatabase(TargetDatabasePort):
     def get_row_counts(self) -> Dict[str, int]:
         return {}
 
+    def get_target_schema_status(self) -> tuple[str, List[str]]:
+        return "test", []
+
     def save_users(self, users: List[Any]) -> int:
         self.saved_users.extend(users)
         return len(users)
@@ -219,28 +222,3 @@ def test_full_orchestration_dry_run():
     assert summary["dry_run"] is True
     assert summary["total_extracted"] >= 3
     assert len(target.saved_users) == 0  # Em dry-run não salva nada
-
-
-def test_seed_credentials_use_case():
-    from src.application.use_cases.seed_credentials_use_case import SeedCredentialsUseCase
-    target = MockTargetDatabase()
-    id_mapper = InMemoryIdMapper()
-    reporter = MagicMock()
-
-    use_case = SeedCredentialsUseCase(
-        target_db=target,
-        id_mapper=id_mapper,
-        reporter=reporter,
-    )
-
-    result = use_case.execute(dry_run=False)
-    assert result["extracted"] == 4
-    assert result["migrated"] == 4
-    assert result["errors"] == 0
-    assert len(target.saved_users) == 4
-
-    roles = {u.role for u in target.saved_users}
-    assert "ADMIN" in roles
-    assert "SUPER_ADMIN" in roles
-    assert "COMPANY" in roles
-    assert "STUDENT" in roles

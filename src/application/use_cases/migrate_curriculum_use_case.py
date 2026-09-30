@@ -52,26 +52,33 @@ class MigrateCurriculumUseCase(StepMigrationPort):
         languages: List[LanguageEntity] = []
         qualifications: List[QualificationEntity] = []
 
+        def persist_batch(batch, save_method, table_name):
+            nonlocal migrated_count, errors_count
+            if dry_run or not batch:
+                return
+            record_count = len(batch)
+            try:
+                saved = save_method(batch)
+                migrated_count += saved
+                errors_count += record_count - saved
+                if saved < record_count:
+                    self.reporter.log_error(
+                        f"{record_count - saved} registros de {table_name} nao puderam ser persistidos."
+                    )
+            except Exception as e:
+                errors_count += record_count
+                self.reporter.log_error(f"Erro ao persistir registros de {table_name}: {e}", e)
+            finally:
+                batch.clear()
+
         def flush_exp_batch():
-            if not dry_run and experiences:
-                try:
-                    self.target_db.save_experiences(experiences)
-                finally:
-                    experiences.clear()
+            persist_batch(experiences, self.target_db.save_experiences, "experiencia")
 
         def flush_lang_batch():
-            if not dry_run and languages:
-                try:
-                    self.target_db.save_languages(languages)
-                finally:
-                    languages.clear()
+            persist_batch(languages, self.target_db.save_languages, "idioma")
 
         def flush_qual_batch():
-            if not dry_run and qualifications:
-                try:
-                    self.target_db.save_qualifications(qualifications)
-                finally:
-                    qualifications.clear()
+            persist_batch(qualifications, self.target_db.save_qualifications, "qualificacao")
 
         # 1. Experiências
         for row in self.source_db.get_experiencias():
@@ -95,7 +102,8 @@ class MigrateCurriculumUseCase(StepMigrationPort):
                     skipped_count += 1
                     continue
                 experiences.append(entity)
-                migrated_count += 1
+                if dry_run:
+                    migrated_count += 1
 
                 if len(experiences) >= self.batch_size:
                     flush_exp_batch()
@@ -123,7 +131,8 @@ class MigrateCurriculumUseCase(StepMigrationPort):
                     skipped_count += 1
                     continue
                 languages.append(entity)
-                migrated_count += 1
+                if dry_run:
+                    migrated_count += 1
 
                 if len(languages) >= self.batch_size:
                     flush_lang_batch()
@@ -155,7 +164,8 @@ class MigrateCurriculumUseCase(StepMigrationPort):
                     skipped_count += 1
                     continue
                 qualifications.append(entity)
-                migrated_count += 1
+                if dry_run:
+                    migrated_count += 1
 
                 if len(qualifications) >= self.batch_size:
                     flush_qual_batch()

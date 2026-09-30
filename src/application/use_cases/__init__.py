@@ -6,7 +6,6 @@ from src.application.use_cases.migrate_curriculum_use_case import MigrateCurricu
 from src.application.use_cases.migrate_applications_use_case import MigrateApplicationsUseCase
 from src.application.use_cases.migrate_notifications_use_case import MigrateNotificationsUseCase
 from src.application.use_cases.migrate_logs_use_case import MigrateLogsUseCase
-from src.application.use_cases.seed_credentials_use_case import SeedCredentialsUseCase
 from src.application.use_cases.run_full_migration_use_case import RunFullMigrationUseCase
 
 __all__ = [
@@ -18,8 +17,6 @@ __all__ = [
     "MigrateApplicationsUseCase",
     "MigrateNotificationsUseCase",
     "MigrateLogsUseCase",
-    "SeedCredentialsUseCase",
     "RunFullMigrationUseCase",
 ]
-
 

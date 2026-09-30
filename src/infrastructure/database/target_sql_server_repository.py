@@ -51,6 +51,26 @@ class TargetSqlServerRepository(TargetDatabasePort):
                     counts[table] = 0
         return counts
 
+    def get_target_schema_status(self) -> tuple[str, List[str]]:
+        required_tables = [
+            "user", "company", "address", "contact", "phone", "student",
+            "job", "applications", "experience", "language", "qualification",
+            "notification", "log",
+        ]
+        with ConnectionFactory.create_connection(self.settings) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT DB_NAME()")
+            database_name = cursor.fetchone()[0]
+            cursor.execute(
+                "SELECT t.name FROM sys.tables t "
+                "INNER JOIN sys.schemas s ON s.schema_id = t.schema_id "
+                "WHERE s.name = 'dbo'"
+            )
+            existing_tables = {row[0].lower() for row in cursor.fetchall()}
+
+        missing_tables = [table for table in required_tables if table.lower() not in existing_tables]
+        return database_name, missing_tables
+
     def clean_target_tables(self) -> None:
         """
         Remove todos os registros das tabelas do banco de destino respeitando

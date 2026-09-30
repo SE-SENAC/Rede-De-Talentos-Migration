@@ -12,11 +12,9 @@ from src.application.use_cases.migrate_curriculum_use_case import MigrateCurricu
 from src.application.use_cases.migrate_applications_use_case import MigrateApplicationsUseCase
 from src.application.use_cases.migrate_notifications_use_case import MigrateNotificationsUseCase
 from src.application.use_cases.migrate_logs_use_case import MigrateLogsUseCase
-from src.application.use_cases.seed_credentials_use_case import SeedCredentialsUseCase
 from src.application.use_cases.run_full_migration_use_case import RunFullMigrationUseCase
 
 from src.domain.ports.inbound.run_full_migration_port import RunFullMigrationPort
-from src.domain.ports.inbound.step_migration_port import StepMigrationPort
 from src.domain.ports.outbound.source_database_port import SourceDatabasePort
 from src.domain.ports.outbound.target_database_port import TargetDatabasePort
 from src.domain.ports.outbound.id_mapping_port import IdMappingPort
@@ -105,12 +103,6 @@ class Container:
             batch_size=self.settings.batch_size,
         )
 
-        self.seed_credentials_use_case = SeedCredentialsUseCase(
-            target_db=self.target_db,
-            id_mapper=self.id_mapper,
-            reporter=self.reporter,
-        )
-
         self.migration_orchestrator: RunFullMigrationPort = RunFullMigrationUseCase(
             migrate_users=self.migrate_users_use_case,
             migrate_companies=self.migrate_companies_use_case,
@@ -120,15 +112,11 @@ class Container:
             migrate_applications=self.migrate_applications_use_case,
             migrate_notifications=self.migrate_notifications_use_case,
             migrate_logs=self.migrate_logs_use_case,
-            seed_credentials=self.seed_credentials_use_case,
             reporter=self.reporter,
         )
 
     def get_orchestrator(self) -> RunFullMigrationPort:
         return self.migration_orchestrator
-
-    def get_seed_credentials_use_case(self) -> StepMigrationPort:
-        return self.seed_credentials_use_case
 
     def get_source_db(self) -> SourceDatabasePort:
         return self.source_db
@@ -138,4 +126,3 @@ class Container:
 
     def get_reporter(self) -> MigrationReporterPort:
         return self.reporter
-

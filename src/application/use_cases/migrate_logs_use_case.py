@@ -47,11 +47,21 @@ class MigrateLogsUseCase(StepMigrationPort):
         logs: List[LogEntity] = []
 
         def flush_logs_batch():
-            if not dry_run and logs:
-                try:
-                    self.target_db.save_logs(logs)
-                finally:
-                    logs.clear()
+            nonlocal migrated_count, errors_count
+            if dry_run or not logs:
+                return
+            record_count = len(logs)
+            try:
+                saved = self.target_db.save_logs(logs)
+                migrated_count += saved
+                errors_count += record_count - saved
+                if saved < record_count:
+                    self.reporter.log_error(f"{record_count - saved} logs nao puderam ser persistidos.")
+            except Exception as e:
+                errors_count += record_count
+                self.reporter.log_error(f"Erro ao persistir lote de logs: {e}", e)
+            finally:
+                logs.clear()
 
         # 1. Logs de Administrador
         for row in self.source_db.get_logs_admin():
@@ -70,7 +80,8 @@ class MigrateLogsUseCase(StepMigrationPort):
                 )
                 entity = EntityFactory.create_log_from_admin(dto, self.id_mapper)
                 logs.append(entity)
-                migrated_count += 1
+                if dry_run:
+                    migrated_count += 1
 
                 if len(logs) >= self.batch_size:
                     flush_logs_batch()
@@ -97,7 +108,8 @@ class MigrateLogsUseCase(StepMigrationPort):
                 )
                 entity = EntityFactory.create_log_from_job(dto, self.id_mapper)
                 logs.append(entity)
-                migrated_count += 1
+                if dry_run:
+                    migrated_count += 1
 
                 if len(logs) >= self.batch_size:
                     flush_logs_batch()
@@ -124,7 +136,8 @@ class MigrateLogsUseCase(StepMigrationPort):
                 )
                 entity = EntityFactory.create_log_from_user(dto, self.id_mapper)
                 logs.append(entity)
-                migrated_count += 1
+                if dry_run:
+                    migrated_count += 1
 
                 if len(logs) >= self.batch_size:
                     flush_logs_batch()

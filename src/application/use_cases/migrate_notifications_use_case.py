@@ -42,11 +42,23 @@ class MigrateNotificationsUseCase(StepMigrationPort):
         notifications: List[NotificationEntity] = []
 
         def flush_notifications_batch():
-            if not dry_run and notifications:
-                try:
-                    self.target_db.save_notifications(notifications)
-                finally:
-                    notifications.clear()
+            nonlocal migrated_count, errors_count
+            if dry_run or not notifications:
+                return
+            record_count = len(notifications)
+            try:
+                saved = self.target_db.save_notifications(notifications)
+                migrated_count += saved
+                errors_count += record_count - saved
+                if saved < record_count:
+                    self.reporter.log_error(
+                        f"{record_count - saved} notificacoes nao puderam ser persistidas."
+                    )
+            except Exception as e:
+                errors_count += record_count
+                self.reporter.log_error(f"Erro ao persistir notificacoes: {e}", e)
+            finally:
+                notifications.clear()
 
         for row in self.source_db.get_notifications():
             extracted_count += 1
@@ -78,7 +90,8 @@ class MigrateNotificationsUseCase(StepMigrationPort):
                     continue
 
                 notifications.append(notif_entity)
-                migrated_count += 1
+                if dry_run:
+                    migrated_count += 1
 
                 if len(notifications) >= self.batch_size:
                     flush_notifications_batch()

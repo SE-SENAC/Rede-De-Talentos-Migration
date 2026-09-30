@@ -10,7 +10,6 @@ from src.application.use_cases.migrate_curriculum_use_case import MigrateCurricu
 from src.application.use_cases.migrate_applications_use_case import MigrateApplicationsUseCase
 from src.application.use_cases.migrate_notifications_use_case import MigrateNotificationsUseCase
 from src.application.use_cases.migrate_logs_use_case import MigrateLogsUseCase
-from src.application.use_cases.seed_credentials_use_case import SeedCredentialsUseCase
 from src.domain.ports.inbound.run_full_migration_port import RunFullMigrationPort
 from src.domain.ports.outbound.migration_reporter_port import MigrationReporterPort
 
@@ -27,7 +26,6 @@ class RunFullMigrationUseCase(RunFullMigrationPort):
     6. Applications (Inscrições)
     7. Notifications (Notificações)
     8. Logs (Trilha de auditoria consolidada)
-    9. SeedCredentials (Garantia de credenciais ativas para ambiente dev/homolog)
     """
 
     def __init__(
@@ -41,7 +39,6 @@ class RunFullMigrationUseCase(RunFullMigrationPort):
         migrate_notifications: MigrateNotificationsUseCase,
         migrate_logs: MigrateLogsUseCase,
         reporter: MigrationReporterPort,
-        seed_credentials: SeedCredentialsUseCase | None = None
     ):
         self.steps_map = {
             "users": migrate_users,
@@ -53,8 +50,6 @@ class RunFullMigrationUseCase(RunFullMigrationPort):
             "notifications": migrate_notifications,
             "logs": migrate_logs,
         }
-        if seed_credentials:
-            self.steps_map["seed_credentials"] = seed_credentials
         self.reporter = reporter
 
     def execute(self, dry_run: bool = False, specific_step: str | None = None) -> Dict[str, Any]:
