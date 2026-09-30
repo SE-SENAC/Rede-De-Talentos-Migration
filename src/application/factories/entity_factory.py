@@ -206,14 +206,15 @@ class EntityFactory:
 
         # 4. Company
         now = datetime.now()
-        legal_name = dto.razao_social or dto.nome_fantasia or "Empresa Sem Razão Social"
+        legal_name = (dto.razao_social or dto.nome_fantasia or "Empresa Sem Razão Social").strip()
+        trade_name = (dto.nome_fantasia or dto.razao_social or legal_name).strip()
         description = dto.descricao or f"Perfil institucional da empresa {legal_name}"
 
         company = CompanyEntity(
             id=company_id,
             user_id=user_id,
             cnpj=CNPJ.create(dto.cnpj),
-            legal_name=legal_name[:50],
+            legal_name=legal_name[:150],
             description=description[:500],
             is_senac_partner=bool(dto.parceira_senac or False),
             approval_status=ApprovalStatus.from_legacy(dto.status_aprovacao),
@@ -223,6 +224,7 @@ class EntityFactory:
             logourl=dto.logo_url[:255] if dto.logo_url else None,
             created_at=dto.data_criacao or now,
             updated_at=dto.data_atualizacao or now,
+            trade_name=trade_name[:150],
         )
 
         return address, contact, phone, company

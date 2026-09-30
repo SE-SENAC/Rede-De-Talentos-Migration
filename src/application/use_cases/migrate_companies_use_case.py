@@ -82,10 +82,20 @@ class MigrateCompaniesUseCase(StepMigrationPort):
             extracted_count += 1
             empresa_legacy_id = row.get("EmpresaId") or row.get("Id") or row.get("_pk")
             try:
+                normalized_row = {str(key).strip().casefold().replace(" ", "").replace("_", ""): value
+                                  for key, value in row.items() if not str(key).startswith("_")}
+
+                def legacy_value(*names):
+                    for name in names:
+                        value = normalized_row.get(name.casefold().replace(" ", "").replace("_", ""))
+                        if value is not None and (not isinstance(value, str) or value.strip()):
+                            return value
+                    return None
+
                 dto = LegacyCompanyDTO(
                     id=empresa_legacy_id,
-                    nome_fantasia=row.get("NomeFantasia"),
-                    razao_social=row.get("RazaoSocial"),
+                    nome_fantasia=legacy_value("NomeFantasia", "Nome Fantasia", "nome_fantasia"),
+                    razao_social=legacy_value("RazaoSocial", "Razão Social", "razao_social"),
                     cnpj=row.get("CNPJ"),
                     telefone=row.get("Telefone"),
                     logradouro=row.get("Logradouro"),

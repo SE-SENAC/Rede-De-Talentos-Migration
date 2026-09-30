@@ -153,7 +153,12 @@ class TargetSqlServerRepository(TargetDatabasePort):
             )
             for a in addresses
         ]
-        return self._execute_batch_resilient(sql, params, "address")
+        update_sql = """
+        UPDATE [dbo].[address]
+        SET street = ?, number = ?, neighborhood = ?, city = ?, state = ?, complement = ?, zipcode = ?
+        WHERE id = ?
+        """
+        return self._execute_upsert_resilient(sql, update_sql, params, "address")
 
     def save_contacts(self, contacts: List[ContactEntity]) -> int:
         if not contacts:
@@ -167,7 +172,12 @@ class TargetSqlServerRepository(TargetDatabasePort):
             (str(c.id), str(c.email), 1 if c.show_email else 0, 1 if c.show_phone else 0)
             for c in contacts
         ]
-        return self._execute_batch_resilient(sql, params, "contact")
+        update_sql = """
+        UPDATE [dbo].[contact]
+        SET email = ?, show_email = ?, show_phone = ?
+        WHERE id = ?
+        """
+        return self._execute_upsert_resilient(sql, update_sql, params, "contact")
 
     def save_phones(self, phones: List[PhoneEntity]) -> int:
         if not phones:
@@ -181,29 +191,84 @@ class TargetSqlServerRepository(TargetDatabasePort):
             (str(p.id), str(p.contact_id), p.phone.ddi, p.phone.ddd, p.phone.number)
             for p in phones
         ]
-        return self._execute_batch_resilient(sql, params, "phone")
+        update_sql = """
+        UPDATE [dbo].[phone]
+        SET contact_id = ?, ddi = ?, ddd = ?, number = ?
+        WHERE id = ?
+        """
+        return self._execute_upsert_resilient(sql, update_sql, params, "phone")
+
+    def _execute_upsert_resilient(
+        self,
+        insert_sql: str,
+        update_sql: str,
+        params: List[Tuple[Any, ...]],
+        table_name: str,
+    ) -> int:
+        """Insere registros novos e atualiza IDs existentes para permitir reexecução."""
+        if not params:
+            return 0
+
+        written = 0
+        with ConnectionFactory.create_connection(self.settings) as conn:
+            cursor = conn.cursor()
+            try:
+                for row in params:
+                    # O primeiro parâmetro do INSERT é sempre o ID; no UPDATE ele vem por último.
+                    cursor.execute(update_sql, *row[1:], row[0])
+                    if cursor.rowcount == 0:
+                        cursor.execute(insert_sql, *row)
+                    written += 1
+                conn.commit()
+                return written
+            except Exception as e:
+                conn.rollback()
+                raise RuntimeError(f"Falha ao persistir lote da tabela [{table_name}]: {e}") from e
 
     def save_companies(self, companies: List[CompanyEntity]) -> int:
         if not companies:
             return 0
         sql = """
         INSERT INTO [dbo].[company] (
-            id, user_id, address_id, contact_id, cnpj, legal_name, description,
+            id, user_id, address_id, contact_id, cnpj, legal_name, trade_name, description,
             sector, state_registration, municipal_registration, is_senac_partner,
             approval_status, websiteurl, logourl, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         params = [
             (
                 str(c.id), str(c.user_id), str(c.address_id) if c.address_id else None,
                 str(c.contact_id) if c.contact_id else None, str(c.cnpj), c.legal_name,
-                c.description, c.sector, c.state_registration, c.municipal_registration,
+                c.trade_name, c.description, c.sector, c.state_registration, c.municipal_registration,
                 1 if c.is_senac_partner else 0, c.approval_status.value, c.websiteurl,
                 c.logourl, c.created_at, c.updated_at
             )
             for c in companies
         ]
-        return self._execute_batch_resilient(sql, params, "company")
+        update_sql = """
+        UPDATE [dbo].[company]
+        SET user_id = ?, address_id = ?, contact_id = ?, cnpj = ?, legal_name = ?,
+            trade_name = ?, description = ?, sector = ?, state_registration = ?,
+            municipal_registration = ?, is_senac_partner = ?, approval_status = ?,
+            websiteurl = ?, logourl = ?, created_at = ?, updated_at = ?
+        WHERE id = ?
+        """
+        written = 0
+        with ConnectionFactory.create_connection(self.settings) as conn:
+            cursor = conn.cursor()
+            for row in params:
+                company_id = row[0]
+                update_params = (*row[1:], company_id)
+                try:
+                    cursor.execute(update_sql, *update_params)
+                    if cursor.rowcount == 0:
+                        cursor.execute(sql, *row)
+                    conn.commit()
+                    written += 1
+                except Exception:
+                    conn.rollback()
+                    raise
+        return written
 
     def save_students(self, students: List[StudentEntity]) -> int:
         if not students:

@@ -23,4 +23,4 @@ class CompanyEntity:
     logourl: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
-
+    trade_name: str | None = None
