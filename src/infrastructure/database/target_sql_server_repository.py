@@ -340,12 +340,6 @@ class TargetSqlServerRepository(TargetDatabasePort):
     def save_logs(self, logs: List[LogEntity]) -> int:
         if not logs:
             return 0
-        sql = """
-        INSERT INTO [dbo].[log] (
-            id, user_id, type_name, user_name, type_action, description,
-            reason, message, ip_address, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """
         params = [
             (
                 str(l.id), l.user_id, l.type_name, l.user_name, l.type_action,
@@ -354,4 +348,34 @@ class TargetSqlServerRepository(TargetDatabasePort):
             )
             for l in logs
         ]
-        return self._execute_batch_resilient(sql, params, "log")
+        # A migração é reexecutável: os UUIDs determinísticos já existentes precisam
+        # ser atualizados para refletir o novo mapeamento, em vez de ignorados por PK.
+        update_sql = """
+        UPDATE [dbo].[log]
+        SET user_id = ?, type_name = ?, user_name = ?, type_action = ?,
+            description = ?, reason = ?, message = ?, ip_address = ?,
+            created_at = ?, updated_at = ?
+        WHERE id = ?
+        """
+        insert_sql = """
+        INSERT INTO [dbo].[log] (
+            id, user_id, type_name, user_name, type_action, description,
+            reason, message, ip_address, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        written = 0
+        with ConnectionFactory.create_connection(self.settings) as conn:
+            cursor = conn.cursor()
+            for row in params:
+                log_id, user_id, type_name, user_name, type_action, description, reason, message, ip_address, created_at, updated_at = row
+                try:
+                    cursor.execute(update_sql, user_id, type_name, user_name, type_action, description,
+                                   reason, message, ip_address, created_at, updated_at, log_id)
+                    if cursor.rowcount == 0:
+                        cursor.execute(insert_sql, *row)
+                    conn.commit()
+                    written += 1
+                except Exception:
+                    conn.rollback()
+                    raise
+        return written

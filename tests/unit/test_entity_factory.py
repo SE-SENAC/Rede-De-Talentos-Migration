@@ -6,6 +6,9 @@ from src.application.dtos.legacy_dtos import (
     LegacyStudentDTO,
     LegacyVagaDTO,
     LegacyExperienceDTO,
+    LegacyLogAdminDTO,
+    LegacyLogJobDTO,
+    LegacyLogUserDTO,
 )
 from src.application.factories.uuid_factory import UUIDFactory
 from src.application.factories.entity_factory import EntityFactory
@@ -60,6 +63,39 @@ def test_admin_factory():
     assert admin_entity.name == "admin_ntic"
     assert admin_entity.role == UserRole.SUPER_ADMIN
     assert admin_entity.is_admin is True
+
+
+def test_legacy_admin_log_maps_to_backend_activity_contract():
+    entity = EntityFactory.create_log_from_admin(
+        LegacyLogAdminDTO(1, 10, "Admin", "DELETE", "Excluiu uma vaga", "127.0.0.1", "Mozilla", datetime(2020, 1, 2)),
+        InMemoryIdMapper(),
+    )
+    assert entity.type_name == "LOG_ATIVIDATE"
+    assert entity.type_action == "DELETAR"
+    assert entity.description == "Excluiu uma vaga"
+    assert entity.message == "Mozilla"
+    assert entity.created_at == datetime(2020, 1, 2)
+    assert entity.user_id is None  # legacy integer IDs must not be persisted as UUIDs
+
+
+def test_legacy_log_error_and_job_action_mapping():
+    mapper = InMemoryIdMapper()
+    error = EntityFactory.create_log_from_user(
+        LegacyLogUserDTO(2, 20, "user@example.com", "LOGIN", "Falha HTTP 401 ao autenticar", "127.0.0.1", None, None),
+        mapper,
+    )
+    assert error.type_name == "LOG_ERRO"
+    assert error.type_action == "ATUALIZAR"
+    assert error.reason == "Falha registrada na trilha do usuário"
+
+    job = EntityFactory.create_log_from_job(
+        LegacyLogJobDTO(3, 99, "Atualização de status", "Status alterado", None, "Empresa", 30, None),
+        mapper,
+    )
+    assert job.type_name == "LOG_ATIVIDATE"
+    assert job.type_action == "ATUALIZAR"
+    assert job.description == "Atualização de status"
+    assert job.message == "Status alterado"
 
 
 def test_job_factory_removes_recruiter_and_maps_company():

@@ -1,5 +1,5 @@
-import re
 from datetime import datetime
+import re
 from typing import Tuple, Dict, Any
 from uuid import UUID
 
@@ -44,6 +44,34 @@ from src.domain.value_objects.phone_number import PhoneNumber
 
 
 class EntityFactory:
+
+    @staticmethod
+    def _normalize_log_action(value: str | None) -> str:
+        """Mapeia verbos e descrições legadas para o enum TypeAction do backend."""
+        text = (value or "").strip().upper()
+        if text in {"POST"}:
+            return "CRIAR"
+        if text in {"PUT", "PATCH"}:
+            return "ATUALIZAR"
+        if text in {"DELETE"}:
+            return "DELETAR"
+        if any(token in text for token in ("DELETE", "DELET", "EXCLU", "REMOV", "CANCEL")):
+            return "DELETAR"
+        if any(token in text for token in ("UPDATE", "ATUALIZ", "EDIT", "ALTER", "STATUS", "APROV", "REPROV")):
+            return "ATUALIZAR"
+        if any(token in text for token in ("CREATE", "CRIAR", "CADASTR", "INSERT", "NOV", "PUBLIC")):
+            return "CRIAR"
+        return "ATUALIZAR" if text else "CRIAR"
+
+    @staticmethod
+    def _log_is_error(*values: str | None) -> bool:
+        text = " ".join(value or "" for value in values).upper()
+        return bool(re.search(r"(?:HTTP\s*)?[45]\d\d|\b(?:ERRO|ERROR|FALHA|FAIL|EXCECAO|EXCEÇÃO|EXCEPTION|REJEIT|NEGAD|INVALID)", text))
+
+    @staticmethod
+    def _log_text(value: str | None, fallback: str, max_length: int = 1000) -> str:
+        text = (value or "").strip() or fallback
+        return text[:max_length]
     """
     Fábrica responsável por orquestrar a conversão entre DTOs legados
     e as Entidades puras do Domínio, aplicando higienização, defaults
@@ -476,21 +504,23 @@ class EntityFactory:
     ) -> LogEntity:
         log_id = UUIDFactory.create_deterministic("log_admin", dto.id)
         user_id = id_mapper.get_mapping("user", f"admin_{dto.admin_id}")
-        user_id_str = str(user_id) if user_id else str(dto.admin_id)
+        user_id_str = str(user_id) if user_id else ""
 
         now = datetime.now()
         created_at = dto.data_criacao or now
 
+        description = cls._log_text(dto.descricao, "Ação administrativa legada", 255)
+        is_error = cls._log_is_error(dto.tipo_acao, description)
         return LogEntity(
             id=log_id,
-            type_name="ADMIN",
-            user_id=user_id_str[:255],
-            user_name=dto.nome_de_usuario[:255] if dto.nome_de_usuario else None,
-            type_action=dto.tipo_acao[:255] if dto.tipo_acao else "ACTION",
-            description=dto.descricao[:255] if dto.descricao else None,
-            reason=None,
-            message=dto.user_agent[:500] if dto.user_agent else None,
-            ip_address=dto.ipv4[:255] if dto.ipv4 else None,
+            type_name="LOG_ERRO" if is_error else "LOG_ATIVIDATE",
+            user_id=user_id_str[:255] or None,
+            user_name=dto.nome_de_usuario[:150] if dto.nome_de_usuario else None,
+            type_action=cls._normalize_log_action(dto.tipo_acao),
+            description=description,
+            reason=cls._log_text(dto.user_agent, "Falha registrada na trilha administrativa", 255) if is_error else None,
+            message=cls._log_text(dto.user_agent, description, 500),
+            ip_address=dto.ipv4[:45] if dto.ipv4 else None,
             created_at=created_at,
             updated_at=created_at,
         )
@@ -503,20 +533,22 @@ class EntityFactory:
     ) -> LogEntity:
         log_id = UUIDFactory.create_deterministic("log_job", dto.id)
         user_id = id_mapper.get_mapping("user", dto.usuario_id)
-        user_id_str = str(user_id) if user_id else str(dto.usuario_id or dto.admin_id or "")
+        user_id_str = str(user_id) if user_id else ""
 
         now = datetime.now()
         created_at = dto.data_criacao or now
 
+        description = cls._log_text(dto.acao, f"Ação na vaga legada {dto.job_id}", 255)
+        is_error = cls._log_is_error(dto.acao, dto.motivo)
         return LogEntity(
             id=log_id,
-            type_name="JOB",
+            type_name="LOG_ERRO" if is_error else "LOG_ATIVIDATE",
             user_id=user_id_str[:255] if user_id_str else None,
-            user_name=dto.tipo_usuario[:255] if dto.tipo_usuario else None,
-            type_action=dto.acao[:255] if dto.acao else "JOB_ACTION",
-            description=f"Log associado à Vaga legada {dto.job_id}",
-            reason=dto.motivo[:255] if dto.motivo else None,
-            message=None,
+            user_name=dto.tipo_usuario[:150] if dto.tipo_usuario else None,
+            type_action=cls._normalize_log_action(dto.acao),
+            description=description,
+            reason=cls._log_text(dto.motivo, "Falha registrada na operação da vaga", 255) if is_error else (dto.motivo[:255] if dto.motivo else None),
+            message=cls._log_text(dto.motivo, description, 500),
             ip_address=None,
             created_at=created_at,
             updated_at=created_at,
@@ -530,21 +562,23 @@ class EntityFactory:
     ) -> LogEntity:
         log_id = UUIDFactory.create_deterministic("log_user", dto.id)
         user_id = id_mapper.get_mapping("user", dto.usuario_id)
-        user_id_str = str(user_id) if user_id else str(dto.usuario_id)
+        user_id_str = str(user_id) if user_id else ""
 
         now = datetime.utcnow()
         created_at = dto.data_criacao or now
 
+        description = cls._log_text(dto.descricao, "Ação de usuário legada", 255)
+        is_error = cls._log_is_error(dto.tipo_acao, description)
         return LogEntity(
             id=log_id,
-            type_name="USER",
-            user_id=user_id_str[:255],
-            user_name=dto.email[:255] if dto.email else None,
-            type_action=dto.tipo_acao[:255] if dto.tipo_acao else "USER_ACTION",
-            description=dto.descricao[:255] if dto.descricao else None,
-            reason=None,
-            message=dto.user_agent[:500] if dto.user_agent else None,
-            ip_address=dto.ipv4[:255] if dto.ipv4 else None,
+            type_name="LOG_ERRO" if is_error else "LOG_ATIVIDATE",
+            user_id=user_id_str[:255] or None,
+            user_name=dto.email[:150] if dto.email else None,
+            type_action=cls._normalize_log_action(dto.tipo_acao),
+            description=description,
+            reason=cls._log_text(dto.user_agent, "Falha registrada na trilha do usuário", 255) if is_error else None,
+            message=cls._log_text(dto.user_agent, description, 500),
+            ip_address=dto.ipv4[:45] if dto.ipv4 else None,
             created_at=created_at,
             updated_at=created_at,
         )
