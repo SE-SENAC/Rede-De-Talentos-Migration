@@ -1,4 +1,5 @@
 from enum import Enum
+import unicodedata
 
 
 class JobWorkMode(str, Enum):
@@ -55,16 +56,22 @@ class JobStatus(str, Enum):
     def from_legacy(cls, status: any) -> "JobStatus":
         if not status:
             return cls.OPEN
-        cleaned = str(status).strip().upper()
-        if cleaned in ("ABERTA", "ABERTO", "OPEN", "ATIVA", "ATIVO", "1"):
+        cleaned = unicodedata.normalize("NFKD", str(status).strip())
+        cleaned = "".join(char for char in cleaned if not unicodedata.combining(char))
+        cleaned = "_".join(cleaned.upper().replace("-", "_").split())
+        if cleaned in ("ABERTA", "ABERTO", "OPEN", "ATIVA", "ATIVO", "APROVADA", "APROVADO", "APPROVED", "1"):
             return cls.OPEN
-        if cleaned in ("ENCERRADA", "ENCERRADO", "FECHADA", "FECHADO", "CLOSED", "0"):
+        if cleaned in ("ENCERRADA", "ENCERRADO", "FECHADA", "FECHADO", "FINALIZADA", "FINALIZADO", "CLOSED", "0"):
             return cls.CLOSED
         if cleaned in ("PREENCHIDA", "FILLED"):
             return cls.FILLED
         if cleaned in ("CANCELADA", "CANCELADO", "CANCELLED"):
             return cls.CANCELLED
-        if cleaned in ("EM_ANALISE", "EM ANÁLISE", "UNDER_REVIEW", "PENDENTE"):
+        if cleaned in (
+            "ANALISE", "EM_ANALISE", "UNDER_REVIEW", "IN_REVIEW", "PENDING",
+            "PENDENTE", "PENDING_APPROVAL", "PENDING_REVIEW", "PENDENTE_APROVACAO",
+            "AGUARDANDO_APROVACAO", "EM_ANALISE_APROVACAO",
+        ):
             return cls.UNDER_REVIEW
         return cls.OPEN
 

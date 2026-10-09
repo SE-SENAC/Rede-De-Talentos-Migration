@@ -46,6 +46,12 @@ from src.domain.value_objects.phone_number import PhoneNumber
 class EntityFactory:
 
     @staticmethod
+    def _to_pascal_case(value: str | None) -> str | None:
+        """Standardize display names with an uppercase initial for each word."""
+        normalized = " ".join(value.split()) if value else ""
+        return normalized.title() if normalized else None
+
+    @staticmethod
     def _normalize_log_action(value: str | None) -> str:
         """Mapeia verbos e descrições legadas para o enum TypeAction do backend."""
         text = (value or "").strip().upper()
@@ -114,7 +120,7 @@ class EntityFactory:
 
         return UserEntity(
             id=user_id,
-            name=dto.nome.strip() if dto.nome else "Usuário Sem Nome",
+            name=EntityFactory._to_pascal_case(dto.nome) or "Usuário Sem Nome",
             email=Email.create(dto.email),
             password=dto.senha or "SENHA_NAO_DEFINIDA",
             role=UserRole.from_legacy(dto.tipo_usuario),
@@ -207,7 +213,8 @@ class EntityFactory:
         # 4. Company
         now = datetime.now()
         legal_name = (dto.razao_social or dto.nome_fantasia or "Empresa Sem Razão Social").strip()
-        trade_name = (dto.nome_fantasia or dto.razao_social or legal_name).strip()
+        trade_name_source = dto.nome_fantasia if dto.nome_fantasia and dto.nome_fantasia.strip() else legal_name
+        trade_name = cls._to_pascal_case(trade_name_source) or legal_name
         description = dto.descricao or f"Perfil institucional da empresa {legal_name}"
 
         company = CompanyEntity(
@@ -306,9 +313,9 @@ class EntityFactory:
         updated_at = dto.data_atualizacao or published_at
 
         # Regra de negócio de cálculo de status por data:
-        # Se a data de encerramento já passou, a vaga é migrada como CLOSED (fechada/encerrada).
+        # Somente vagas abertas expiram; vagas em análise preservam a aprovação pendente.
         job_status = JobStatus.from_legacy(dto.status)
-        if dto.data_encerramento:
+        if job_status == JobStatus.OPEN and dto.data_encerramento:
             try:
                 closing_dt = dto.data_encerramento
                 if hasattr(closing_dt, "date"):
@@ -327,7 +334,7 @@ class EntityFactory:
                 pass
 
         # Title normalization: >= 4 chars, <= 255 bytes
-        raw_title = (dto.titulo or "").strip()
+        raw_title = cls._to_pascal_case(dto.titulo) or ""
         if len(raw_title) < 4:
             raw_title = f"Vaga {raw_title}".strip() if raw_title else "Oportunidade de Trabalho"
             if len(raw_title) < 4:
@@ -385,8 +392,8 @@ class EntityFactory:
         return ExperienceEntity(
             id=exp_id,
             user_id=user_id,
-            empresa=dto.empresa[:100] if dto.empresa else None,
-            cargo=dto.cargo[:100] if dto.cargo else None,
+            empresa=cls._to_pascal_case(dto.empresa)[:100] if dto.empresa and dto.empresa.strip() else None,
+            cargo=cls._to_pascal_case(dto.cargo)[:100] if dto.cargo and dto.cargo.strip() else None,
             descricao=dto.descricao,
             data_inicio=dto.data_inicio,
             data_fim=dto.data_fim,
@@ -413,7 +420,7 @@ class EntityFactory:
         return LanguageEntity(
             id=lang_id,
             user_id=user_id,
-            idioma=dto.idioma[:100] if dto.idioma else "Não informado",
+            idioma=cls._to_pascal_case(dto.idioma)[:100] if dto.idioma and dto.idioma.strip() else "Não informado",
             nivel=dto.fluencia[:50] if dto.fluencia else "Básico",
             criado_em=dto.data_criacao or now,
             atualizado_em=dto.data_atualizacao or now,
@@ -433,14 +440,14 @@ class EntityFactory:
 
         qual_id = UUIDFactory.create_deterministic("qualification", dto.id)
         now = datetime.now()
-        course = dto.curso[:100] if dto.curso else "Qualificação Profissional"
+        course = cls._to_pascal_case(dto.curso)[:100] if dto.curso and dto.curso.strip() else "Qualificação Profissional"
 
         return QualificationEntity(
             id=qual_id,
             user_id=user_id,
             titulo=course,
             curso=course,
-            instituicao=dto.instituicao[:100] if dto.instituicao else "Senac Sergipe",
+            instituicao=cls._to_pascal_case(dto.instituicao)[:100] if dto.instituicao and dto.instituicao.strip() else "Senac Sergipe",
             descricao=dto.descricao,
             data_inicio=dto.data_inicio,
             data_fim=dto.data_fim,
