@@ -14,7 +14,7 @@ class ApplicationStatus(str, Enum):
         if not status:
             return cls.APPLIED
         cleaned = str(status).strip().upper()
-        if "HIRED" in cleaned or "CONTRATAD" in cleaned or "APROVAD" in cleaned:
+        if "HIRED" in cleaned:
             return cls.HIRED
         if "REJECT" in cleaned or "RECUSAD" in cleaned or "REPROVAD" in cleaned:
             return cls.REJECTED

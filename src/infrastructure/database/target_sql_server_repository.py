@@ -77,6 +77,7 @@ class TargetSqlServerRepository(TargetDatabasePort):
         a ordem estrita de integridade referencial (chaves estrangeiras).
         """
         delete_order = [
+            "curriculum_interest",
             "feedbacks",
             "applications",
             "qualification",
