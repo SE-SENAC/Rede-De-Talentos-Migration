@@ -349,3 +349,122 @@ def test_job_short_title_and_description_normalization():
     assert len(job.description) >= 10
     assert job.description == "Nesta vaga vai ser realizado atividades de: atendente"
 
+
+
+def test_parse_bool_handles_various_formats():
+    assert EntityFactory._parse_bool(True) is True
+    assert EntityFactory._parse_bool(False) is False
+    assert EntityFactory._parse_bool(1) is True
+    assert EntityFactory._parse_bool(0) is False
+    assert EntityFactory._parse_bool("SIM") is True
+    assert EntityFactory._parse_bool("sim") is True
+    assert EntityFactory._parse_bool("S") is True
+    assert EntityFactory._parse_bool("1") is True
+    assert EntityFactory._parse_bool("true") is True
+    assert EntityFactory._parse_bool("NÃO") is False
+    assert EntityFactory._parse_bool("nao") is False
+    assert EntityFactory._parse_bool("NAO") is False
+    assert EntityFactory._parse_bool("N") is False
+    assert EntityFactory._parse_bool("0") is False
+    assert EntityFactory._parse_bool("false") is False
+    assert EntityFactory._parse_bool(None, default=False) is False
+    assert EntityFactory._parse_bool(None, default=True) is True
+
+
+def test_job_and_student_pcd_string_from_legacy():
+    from src.domain.enums.student_enums import StudentTypePCD
+    id_mapper = InMemoryIdMapper()
+    company_uuid = UUIDFactory.create_deterministic("company", 1)
+    id_mapper.set_mapping("company", 1, company_uuid)
+
+    job_dto_nao = LegacyVagaDTO(
+        id=1,
+        empresa_id=1,
+        titulo="Auxiliar de Estoque",
+        descricao="Organização e controle de estoque de mercadorias",
+        data_publicacao=None,
+        data_atualizacao=None,
+        data_encerramento=None,
+        segmento="Comércio",
+        modalidade="PRESENCIAL",
+        tipo="CLT",
+        pcd="NÃO",
+        escolaridade_minima=None,
+        idade_minima=None,
+        status="ABERTO",
+        salario=1500.0,
+        salario_maximo=None,
+        beneficios=None,
+        recrutador_id=None,
+        mostrar_email_contato=True,
+        mostrar_salario=True,
+        mostrar_telefone_contato=True,
+        quantidade_vagas=1,
+    )
+    job_nao = EntityFactory.create_job_from_legacy(job_dto_nao, id_mapper)
+    assert job_nao is not None
+    assert job_nao.pcd is False
+
+    job_dto_sim = LegacyVagaDTO(
+        id=2,
+        empresa_id=1,
+        titulo="Auxiliar de Estoque PCD",
+        descricao="Organização e controle de estoque de mercadorias",
+        data_publicacao=None,
+        data_atualizacao=None,
+        data_encerramento=None,
+        segmento="Comércio",
+        modalidade="PRESENCIAL",
+        tipo="CLT",
+        pcd="SIM",
+        escolaridade_minima=None,
+        idade_minima=None,
+        status="ABERTO",
+        salario=1500.0,
+        salario_maximo=None,
+        beneficios=None,
+        recrutador_id=None,
+        mostrar_email_contato=True,
+        mostrar_salario=True,
+        mostrar_telefone_contato=True,
+        quantidade_vagas=1,
+    )
+    job_sim = EntityFactory.create_job_from_legacy(job_dto_sim, id_mapper)
+    assert job_sim is not None
+    assert job_sim.pcd is True
+
+    student_dto_nao = LegacyStudentDTO(
+        id=10,
+        nome="Aluno Normal",
+        cpf="12345678901",
+        usuario_id=10,
+        pcd="NÃO",
+        tipo_pcd=None,
+        escolaridade="SUPERIOR_COMPLETO",
+        aluno_id_sig=None,
+        data_criacao=None,
+        data_atualizacao=None,
+        linkedin_url=None,
+        portfolio=None,
+    )
+    _, student_nao = EntityFactory.create_student_bundle(student_dto_nao, id_mapper)
+    assert student_nao.pcd is False
+    assert student_nao.type_pcd == StudentTypePCD.NON
+
+    student_dto_sim = LegacyStudentDTO(
+        id=11,
+        nome="Aluno PCD",
+        cpf="12345678902",
+        usuario_id=11,
+        pcd="SIM",
+        tipo_pcd="Visual",
+        escolaridade="SUPERIOR_COMPLETO",
+        aluno_id_sig=None,
+        data_criacao=None,
+        data_atualizacao=None,
+        linkedin_url=None,
+        portfolio=None,
+    )
+    _, student_sim = EntityFactory.create_student_bundle(student_dto_sim, id_mapper)
+    assert student_sim.pcd is True
+    assert student_sim.type_pcd == StudentTypePCD.VISUAL

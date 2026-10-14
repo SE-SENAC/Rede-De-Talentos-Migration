@@ -78,6 +78,24 @@ class EntityFactory:
     def _log_text(value: str | None, fallback: str, max_length: int = 1000) -> str:
         text = (value or "").strip() or fallback
         return text[:max_length]
+
+    @staticmethod
+    def _parse_bool(value: Any, default: bool = False) -> bool:
+        """
+        Converte com seguranca valores legados (bool, int, str como 'SIM'/'NAO', '1'/'0', 'true'/'false') para booleano puro.
+        """
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return bool(value)
+        text = str(value).strip().upper()
+        if text in {"SIM", "S", "1", "TRUE", "T", "YES", "Y"}:
+            return True
+        if text in {"NAO", "NÃO", "N", "0", "FALSE", "F", "NO"}:
+            return False
+        return default
     """
     Fábrica responsável por orquestrar a conversão entre DTOs legados
     e as Entidades puras do Domínio, aplicando higienização, defaults
@@ -197,8 +215,8 @@ class EntityFactory:
         contact = ContactEntity(
             id=contact_id,
             email=Email.create(contact_email),
-            show_email=bool(dto.mostrar_email_contato if dto.mostrar_email_contato is not None else True),
-            show_phone=bool(dto.mostrar_telefone_contato if dto.mostrar_telefone_contato is not None else True),
+            show_email=cls._parse_bool(dto.mostrar_email_contato, default=True),
+            show_phone=cls._parse_bool(dto.mostrar_telefone_contato, default=True),
         )
 
         # 3. Phone
@@ -223,7 +241,7 @@ class EntityFactory:
             cnpj=CNPJ.create(dto.cnpj),
             legal_name=legal_name[:150],
             description=description[:500],
-            is_senac_partner=bool(dto.parceira_senac or False),
+            is_senac_partner=cls._parse_bool(dto.parceira_senac, default=False),
             approval_status=ApprovalStatus.from_legacy(dto.status_aprovacao),
             address_id=address_id,
             contact_id=contact_id,
@@ -262,13 +280,13 @@ class EntityFactory:
             id=student_id,
             user_id=user_id,
             cpf=CPF.create(dto.cpf),
-            pcd=bool(dto.pcd or False),
+            pcd=cls._parse_bool(dto.pcd, default=False),
             student_id_siga=str(siga_id)[:50],
             created_at=dto.data_criacao or now,
             updated_at=dto.data_atualizacao or now,
             contact_id=None,
             avatar_url=avatar_url or None,
-            type_pcd=StudentTypePCD.from_legacy(dto.tipo_pcd) if dto.pcd else StudentTypePCD.NON,
+            type_pcd=StudentTypePCD.from_legacy(dto.tipo_pcd) if cls._parse_bool(dto.pcd, default=False) else StudentTypePCD.NON,
             education=StudentEducation.from_legacy(dto.escolaridade),
             linkedin_url=dto.linkedin_url[:255] if dto.linkedin_url else None,
             portfolio=dto.portfolio[:255] if dto.portfolio else None,
@@ -358,16 +376,16 @@ class EntityFactory:
             segment=cls._truncate_to_bytes(dto.segmento, 255) if dto.segmento else None,
             work_mode=JobWorkMode.from_legacy(dto.modalidade),
             type=JobType.from_legacy(dto.tipo),
-            pcd=bool(dto.pcd or False),
+            pcd=cls._parse_bool(dto.pcd, default=False),
             minimum_education=JobEducation.from_legacy(dto.escolaridade_minima),
             minimum_age=dto.idade_minima,
             status=job_status,
             salary=float(dto.salario) if dto.salario is not None else None,
             maximum_salary=float(dto.salario_maximo) if dto.salario_maximo is not None else None,
             number_of_openings=dto.quantidade_vagas or 1,
-            show_contact_email=bool(dto.mostrar_email_contato if dto.mostrar_email_contato is not None else True),
-            show_contact_phone=bool(dto.mostrar_telefone_contato if dto.mostrar_telefone_contato is not None else True),
-            show_salary=bool(dto.mostrar_salario if dto.mostrar_salario is not None else True),
+            show_contact_email=cls._parse_bool(dto.mostrar_email_contato, default=True),
+            show_contact_phone=cls._parse_bool(dto.mostrar_telefone_contato, default=True),
+            show_salary=cls._parse_bool(dto.mostrar_salario, default=True),
             benefits=cls._truncate_to_bytes(dto.beneficios, 1000) if dto.beneficios else None,
             closing_date=dto.data_encerramento,
             published_at=published_at,
@@ -397,7 +415,7 @@ class EntityFactory:
             descricao=dto.descricao,
             data_inicio=dto.data_inicio,
             data_fim=dto.data_fim,
-            atual=bool(dto.atual or False),
+            atual=cls._parse_bool(dto.atual, default=False),
             criado_em=dto.data_criacao or now,
             atualizado_em=dto.data_atualizacao or now,
         )
@@ -451,7 +469,7 @@ class EntityFactory:
             descricao=dto.descricao,
             data_inicio=dto.data_inicio,
             data_fim=dto.data_fim,
-            em_andamento=bool(dto.atual or False),
+            em_andamento=cls._parse_bool(dto.atual, default=False),
             criado_em=dto.data_criacao or now,
             atualizado_em=dto.data_atualizacao or now,
         )
@@ -498,7 +516,7 @@ class EntityFactory:
             user_id=user_id,
             title=dto.titulo[:100] if dto.titulo else "Notificação do Sistema",
             content=dto.conteudo[:500] if dto.conteudo else "Sem conteúdo adicional",
-            is_read=bool(dto.is_read or False),
+            is_read=cls._parse_bool(dto.is_read, default=False),
             type=dto.tipo[:50] if dto.tipo else "GENERAL",
             status=dto.status[:50] if dto.status else "DELIVERED",
             created_at=dto.data_criacao or now,
